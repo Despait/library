@@ -330,7 +330,6 @@ class LibrarySystem:
             self._authors = self._load_authors()
             logger.info("Система инициализирована успешно")
 
-            # Предзаполненные данные, если БД пустая
             if not self._books:
                 self._init_demo_data()
         except sqlite3.Error as e:
@@ -733,8 +732,10 @@ class LibrarySystem:
             now = datetime.now()
             cursor.execute("INSERT INTO loans (book_id, user_id, issue_date) VALUES (?, ?, ?)", 
                          (book_id, user_id, now.isoformat()))
+            # Обновляем статус книги в БД и в памяти
+            cursor.execute("UPDATE books SET status=? WHERE id=?", ("выдана", book_id))
             self._conn.commit()
-            
+
             loan_id = cursor.lastrowid
             loan = Loan(loan_id, book, user, now)
             book.set_status("выдана")
@@ -761,8 +762,10 @@ class LibrarySystem:
             cursor = self._conn.cursor()
             now = datetime.now()
             cursor.execute("UPDATE loans SET return_date=? WHERE id=?", (now.isoformat(), loan_id))
+            # Обновляем статус книги в БД
+            cursor.execute("UPDATE books SET status=? WHERE id=?", ("доступна", loan.get_book().get_id()))
             self._conn.commit()
-            
+
             loan.return_book(now)
             loan.get_book().set_status("доступна")
             loan.get_user().return_book(loan.get_book())
